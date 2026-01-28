@@ -1,0 +1,35 @@
+---
+
+- name: create NetworkManager restriction for student
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/10-student.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [keyfile]
+      unmanaged-devices=*,except:type:wifi
+
+- name: restart NetworkManager to apply restriction
+  ansible.builtin.systemd:
+    name: NetworkManager
+    state: restarted
+
+- name: create polkit restriction for student
+  ansible.builtin.copy:
+    dest: /etc/polkit-1/localauthority/50-local.d/50-student-network.pkla
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Prevent student from changing network settings]
+      Identity=unix-user:student
+      Action=org.freedesktop.NetworkManager.*
+      ResultAny=no
+      ResultInactive=no
+      ResultActive=no
+
+- name: restart polkit to apply restriction
+  ansible.builtin.systemd:
+    name: polkit
+    state: restarted
