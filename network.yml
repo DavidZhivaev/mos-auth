@@ -1,35 +1,329 @@
 ---
 
-- name: create NetworkManager restriction for student
+- name: set default login pam.d
   ansible.builtin.copy:
-    dest: /etc/NetworkManager/conf.d/10-student.conf
-    owner: root
-    group: root
-    mode: '0644'
     content: |
-      [keyfile]
-      unmanaged-devices=*,except:type:wifi
+      #%PAM-1.0
+      auth       include      system-auth
+      account    required     pam_nologin.so
+      account    include      system-auth
+      password   include      system-auth
+      session    required     pam_loginuid.so
+      session    optional     pam_console.so
+      session    required     pam_namespace.so
+      session    optional     pam_keyinit.so force revoke
+      session    include      system-auth
+      session	   required	pam_selinux.so close
+      session    required	pam_selinux.so open
+    dest: /etc/pam.d/login
 
-- name: restart NetworkManager to apply restriction
-  ansible.builtin.systemd:
-    name: NetworkManager
-    state: restarted
+- name: activate usb key login check
+  ansible.builtin.blockinfile:
+    path: /etc/pam.d/login
+    marker: "### USB Check 1580 ###"
+    insertafter: "#%PAM-1.0"
+    content: |
+      auth  [success=1 default=ignore] pam_succeed_if.so user != admin
+      auth  required pam_exec.so quiet /opt/.lycu1580v2/bin/usb_key_check.sh
+  vars:
+    usb_key_login_exclude:
+      - xm1580-1-205-0
+      - xm1580-1-206-0
+      - xm1580-1-207-0
+      - xm1580-1-208-0
+      - xm1580-1-209-0
+      - xm1580-1-215-0
+      - xm1580-2-418-0
+      - xm1580-2-419-0
+      - xm1580-2-422-0
+      - xm1580-2-425-0
+      - xm1580-2-426-0
+      - xm1580-2-427-0
+      - xn1580-2-it1-0
+      - xc1580-2-it2-0
+      - xn1580-2-it3-0
+      - xn1580-2-it4-0
+      - n1580-4-110-0
+      - n1580-4-209-0
+      - n1580-4-220-0
+      - m1580-4-309-0
+      - n1580-4-309-0
+      - n1580-4-320-0
+      - n1580-4-403-0
+  loop:
+    - m1580-1-205
+    - m1580-1-206
+    - m1580-1-207
+    - m1580-1-208
+    - m1580-1-209
+    - m1580-1-215
+    - m1580-2-210
+    - m1580-2-418
+    - n1580-2-418
+    - m1580-2-419
+    - n1580-2-420
+    - m1580-2-422
+    - m1580-2-425
+    - m1580-2-426
+    - m1580-2-427
+    - n1580-2-it1
+    - c1580-2-it2
+    - n1580-2-it3
+    - n1580-2-it4
+    - xn1580-4-110
+    - xn1580-4-209
+    - xn1580-4-220
+    - xm1580-4-309
+    - xn1580-4-309
+    - xn1580-4-320
+    - xn1580-4-403
+  loop_control:
+    loop_var: usb_key_login_item
+  when: usb_key_login_item in ansible_hostname and ansible_hostname not in usb_key_login_exclude
 
-- name: create polkit restriction for student
+- name: set default sddm pam.d
   ansible.builtin.copy:
-    dest: /etc/polkit-1/localauthority/50-local.d/50-student-network.pkla
-    owner: root
-    group: root
-    mode: '0644'
     content: |
-      [Prevent student from changing network settings]
-      Identity=unix-user:student
-      Action=org.freedesktop.NetworkManager.*
-      ResultAny=no
-      ResultInactive=no
-      ResultActive=no
+      #%PAM-1.0
 
-- name: restart polkit to apply restriction
-  ansible.builtin.systemd:
-    name: polkit
-    state: restarted
+      # Block login for root (in GUI through sddm)
+      auth         required      pam_succeed_if.so user != root quiet_success
+
+      auth         substack      system-auth
+      -auth        optional      pam_gnome_keyring.so
+      -auth        optional      pam_kwallet5.so
+      -auth        optional      pam_kwallet.so
+      auth         include       postlogin
+      account      required      pam_nologin.so
+      account      include       system-auth
+      -password    optional      pam_gnome_keyring.so use_authtok
+      password     include       system-auth
+      session      required      pam_loginuid.so
+      session      optional      pam_keyinit.so force revoke
+      session      required      pam_namespace.so
+      -session     optional      pam_gnome_keyring.so auto_start
+      -session     optional      pam_kwallet5.so auto_start
+      -session     optional      pam_kwallet.so auto_start
+      session      include       system-auth
+      session      include       postlogin
+    dest: /etc/pam.d/sddm
+
+- name: activate usb key sddm check
+  ansible.builtin.blockinfile:
+    path: /etc/pam.d/sddm
+    marker: "### USB Check 1580 ###"
+    insertafter: "auth         required      pam_succeed_if.so user != root quiet_success"
+    content: |
+      auth  [success=1 default=ignore] pam_succeed_if.so user != admin
+      auth  required pam_exec.so quiet /opt/.lycu1580v2/bin/usb_key_check.sh
+  vars:
+    usb_key_sddm_exclude:
+      - xm1580-1-205-0
+      - xm1580-1-206-0
+      - xm1580-1-207-0
+      - xm1580-1-208-0
+      - xm1580-1-209-0
+      - xm1580-1-215-0
+      - xm1580-2-418-0
+      - xm1580-2-419-0
+      - xm1580-2-422-0
+      - xm1580-2-425-0
+      - xm1580-2-426-0
+      - xm1580-2-427-0
+      - xn1580-2-it1-0
+      - xc1580-2-it2-0
+      - xn1580-2-it3-0
+      - xn1580-2-it4-0
+      - n1580-4-110-0
+      - n1580-4-209-0
+      - n1580-4-220-0
+      - m1580-4-309-0
+      - n1580-4-309-0
+      - n1580-4-320-0
+      - n1580-4-403-0
+  loop:
+    - xm1580-1-205
+    - xm1580-1-206
+    - xm1580-1-207
+    - xm1580-1-208
+    - xm1580-1-209
+    - xm1580-1-215
+    - xm1580-2-210
+    - m1580-2-418
+    - xn1580-2-418
+    - xm1580-2-419
+    - xn1580-2-420
+    - xm1580-2-422
+    - xm1580-2-425
+    - xm1580-2-426
+    - xm1580-2-427
+    - xn1580-2-it1
+    - xc1580-2-it2
+    - xn1580-2-it3
+    - xn1580-2-it4
+    - xn1580-4-110
+    - xn1580-4-209
+    - xn1580-4-220
+    - xm1580-4-309
+    - xn1580-4-309
+    - xn1580-4-320
+    - xn1580-4-403
+  loop_control:
+    loop_var: usb_key_sddm_item
+  when: usb_key_sddm_item in ansible_hostname and ansible_hostname not in usb_key_sddm_exclude
+
+- name: set default su pam.d
+  ansible.builtin.copy:
+    content: |
+      #%PAM-1.0
+      auth       sufficient   pam_rootok.so
+      # Uncomment the following line to implicitly trust users in the "wheel" group.
+      #auth       sufficient   pam_wheel.so trust use_uid
+      # Uncomment the following line to require a user to be in the "wheel" group.
+      #auth       required     pam_wheel.so use_uid
+      auth       include      system-auth
+      account    include      system-auth
+      account    sufficient   pam_succeed_if.so uid = 0 use_uid quiet
+      password   include      system-auth
+      session    optional     pam_xauth.so
+      session    include      system-auth
+    dest: /etc/pam.d/su
+
+- name: activate usb key su check
+  ansible.builtin.blockinfile:
+    path: /etc/pam.d/su
+    marker: "### USB Check 1580 ###"
+    insertafter: "#%PAM-1.0"
+    content: |
+      auth  [success=1 default=ignore] pam_succeed_if.so user != admin
+      auth  required pam_exec.so quiet /opt/.lycu1580v2/bin/usb_key_check.sh
+  vars:
+    usb_key_su_exclude:
+      - xm1580-1-205-0
+      - xm1580-1-206-0
+      - xm1580-1-207-0
+      - xm1580-1-208-0
+      - xm1580-1-209-0
+      - xm1580-1-215-0
+      - xm1580-2-418-0
+      - xm1580-2-419-0
+      - xm1580-2-422-0
+      - xm1580-2-425-0
+      - xm1580-2-426-0
+      - xm1580-2-427-0
+      - xn1580-2-it1-0
+      - xc1580-2-it2-0
+      - xn1580-2-it3-0
+      - xn1580-2-it4-0
+      - n1580-4-110-0
+      - n1580-4-209-0
+      - n1580-4-220-0
+      - m1580-4-309-0
+      - n1580-4-309-0
+      - n1580-4-320-0
+      - n1580-4-403-0
+  loop:
+    - m1580-1-205
+    - m1580-1-206
+    - m1580-1-207
+    - m1580-1-208
+    - m1580-1-209
+    - m1580-1-215
+    - m1580-2-210
+    - m1580-2-418
+    - n1580-2-418
+    - m1580-2-419
+    - n1580-2-420
+    - m1580-2-422
+    - m1580-2-425
+    - m1580-2-426
+    - m1580-2-427
+    - n1580-2-it1
+    - c1580-2-it2
+    - n1580-2-it3
+    - n1580-2-it4
+    - xn1580-4-110
+    - xn1580-4-209
+    - xn1580-4-220
+    - xm1580-4-309
+    - xn1580-4-309
+    - xn1580-4-320
+    - xn1580-4-403
+  loop_control:
+    loop_var: usb_key_su_item
+  when: usb_key_su_item in ansible_hostname and ansible_hostname not in usb_key_su_exclude
+
+- name: turn off usb key when gui
+  ansible.builtin.blockinfile:
+    path: /etc/pam.d/polkit-1
+    marker: "### USB Check 1580 ###"
+    insertafter: "#%PAM-1.0"
+    state: absent
+    content: |
+      auth  [success=1 default=ignore] pam_succeed_if.so user != admin
+      auth  required pam_exec.so quiet /opt/.lycu1580v2/bin/usb_key_check.sh
+
+- name: turn on usb key when gui
+  ansible.builtin.blockinfile:
+    path: /etc/pam.d/polkit-1
+    marker: "### USB Check 1580 ###"
+    insertafter: "#%PAM-1.0"
+    content: |
+      auth  [success=1 default=ignore] pam_succeed_if.so user != admin
+      auth  required pam_exec.so quiet /opt/.lycu1580v2/bin/usb_key_check.sh
+  vars:
+    usb_key_gui_exclude:
+      - xm1580-1-205-0
+      - xm1580-1-206-0
+      - xm1580-1-207-0
+      - xm1580-1-208-0
+      - xm1580-1-209-0
+      - xm1580-1-215-0
+      - xm1580-2-418-0
+      - xm1580-2-419-0
+      - xm1580-2-422-0
+      - xm1580-2-425-0
+      - xm1580-2-426-0
+      - xm1580-2-427-0
+      - xn1580-2-it1-0
+      - xc1580-2-it2-0
+      - xn1580-2-it3-0
+      - xn1580-2-it4-0
+      - n1580-4-110-0
+      - n1580-4-209-0
+      - n1580-4-220-0
+      - m1580-4-309-0
+      - n1580-4-309-0
+      - n1580-4-320-0
+      - n1580-4-403-0
+  loop:
+    - xm1580-1-205
+    - xm1580-1-206
+    - xm1580-1-207
+    - xm1580-1-208
+    - xm1580-1-209
+    - xm1580-1-215
+    - xm1580-2-210
+    - xm1580-2-418
+    - xn1580-2-418
+    - xm1580-2-419
+    - xn1580-2-420
+    - xm1580-2-422
+    - xm1580-2-425
+    - xm1580-2-426
+    - xm1580-2-427
+    - xn1580-2-it1
+    - xc1580-2-it2
+    - xn1580-2-it3
+    - xn1580-2-it4
+    - xn1580-4-110
+    - xn1580-4-209
+    - xn1580-4-220
+    - xm1580-4-309
+    - xn1580-4-309
+    - xn1580-4-320
+    - xn1580-4-403
+  loop_control:
+    loop_var: usb_key_gui_item
+  when: usb_key_gui_item in ansible_hostname and ansible_hostname not in usb_key_gui_exclude
+
